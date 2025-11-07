@@ -1,0 +1,38 @@
+# First identifying the exact coloumn names
+import pandas as pd
+import glob # A library to help find files
+
+print("--- Starting Diagnostic Script ---")
+
+# Find all CSV files in the folder that start with 'world_happiness_'
+all_files = glob.glob("world_happiness_*.csv")
+
+if not all_files:
+    print("--- ERROR ---")
+    print("No files found matching 'world_happiness_*.csv'.")
+    print("Please make sure your files are in the same folder and named correctly.")
+else:
+    print(f"Found the following files: {all_files}")
+    
+all_data_list = []
+
+for f in all_files:
+    try:
+        # Load the file, skipping bad lines
+        df_year = pd.read_csv(f, on_bad_lines='skip')
+        all_data_list.append(df_year)
+    except Exception as e:
+        print(f"Error reading file {f}: {e}")
+
+# Combine all dataframes
+if all_data_list:
+    df_main = pd.concat(all_data_list, ignore_index=True)
+    
+    print("\n--- DIAGNOSTIC RESULT ---")
+    print("Here are all the unique column names found in your files:")
+    print(list(df_main.columns.unique()))
+    
+else:
+    print("No data was loaded. Cannot list columns.")
+
+print("--- End of Diagnostic Script ---")
