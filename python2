@@ -1,0 +1,150 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# --- 1. SETUP ---
+# Set the visual style for all plots
+sns.set_style("whitegrid")
+print("Starting the data analysis script...")
+
+# --- 2. DATA LOADING & COMBINING ---
+print("Loading and combining data from 2015-2024...")
+years = range(2015, 2025)  # Covers 2015 up to 2024
+all_data_list = []
+
+for year in years:
+    # Use the original file name pattern
+    file_path = f'world_happiness_{year}.csv' 
+    
+    try:
+        # --- THE FIX: Added decimal=',' ---
+        # This tells Pandas to treat commas as decimal points (e.g., '7,597' -> 7.597)
+        df_year = pd.read_csv(
+            file_path, 
+            on_bad_lines='skip', 
+            sep=';', 
+            decimal=','
+        )
+        
+        # Add a 'Year' column to identify which file it came from
+        df_year['Year'] = year
+        
+        # Add this year's data to our list
+        all_data_list.append(df_year)
+    except FileNotFoundError:
+        # Print a warning if a file is missing but don't stop the script
+        print(f"Warning: File not found for {file_path}. Skipping.")
+
+# Combine all individual DataFrames into one single DataFrame
+df_main = pd.concat(all_data_list, ignore_index=True)
+print(f"Successfully loaded and combined data for {len(all_data_list)} years.")
+
+
+# --- 3. DATA HANDLING & CLEANING ---
+print("Cleaning and standardizing data...")
+
+# Combine 'Happiness score' and 'Ladder score' into a single 'Score' column
+if 'Happiness score' in df_main.columns and 'Ladder score' in df_main.columns:
+    df_main['Score'] = df_main['Happiness score'].fillna(df_main['Ladder score'])
+elif 'Happiness score' in df_main.columns:
+    df_main['Score'] = df_main['Happiness score']
+elif 'Ladder score' in df_main.columns:
+    df_main['Score'] = df_main['Ladder score']
+
+# Rename 'Country' to 'Country Name' for clarity
+if 'Country' in df_main.columns:
+    df_main = df_main.rename(columns={'Country': 'Country Name'})
+
+# Define the columns we want to keep for our analysis
+columns_to_keep = [
+    'Country Name', 
+    'Year', 
+    'Score', 
+    'GDP per capita', 
+    'Social support', 
+    'Healthy life expectancy', 
+    'Freedom to make life choices', 
+    'Generosity',
+    'Perceptions of corruption'
+]
+
+# Filter our list to only include columns that actually exist
+final_columns = [col for col in columns_to_keep if col in df_main.columns]
+
+# Create the final clean DataFrame
+df_clean = df_main[final_columns].copy() # Use .copy() to avoid warnings
+
+# Handle missing data: drop any row that has a missing value
+original_rows = len(df_clean)
+df_clean = df_clean.dropna()
+cleaned_rows = len(df_clean)
+print(f"Data cleaning complete. Removed {original_rows - cleaned_rows} rows with missing data.")
+
+# --- DEBUG STEP ---
+print("Columns in final 'df_clean' DataFrame and their types:")
+print(df_clean.info()) # .info() is better, it shows data types (dtypes)
+
+
+# --- 4. VISUALIZATION 1: Average Happiness Over Time ---
+print("Creating Plot 1: Average World Happiness Score (2015-2024)")
+
+# This line should now work because 'Score' is a numeric (float) column
+average_happiness_over_time = df_clean.groupby('Year')['Score'].mean().reset_index()
+
+plt.figure(figsize=(10, 6))
+sns.lineplot(
+    data=average_happiness_over_time, 
+    x='Year', 
+    y='Score', 
+    marker='o' # Add markers to the data points
+)
+plt.title('Average World Happiness Score (2015-2024)')
+plt.ylabel('Average Happiness Score')
+plt.xlabel('Year')
+plt.show()
+
+
+# --- 5. VISUALIZATIONS for 2024 Data ---
+# Check if 2024 data is available in our cleaned DataFrame
+if 2024 in df_clean['Year'].values:
+    # Get just the 2024 data
+    df_2024 = df_clean[df_clean['Year'] == 2024]
+
+    # --- VISUALIZATION 2: Happiness vs. GDP (2024) ---
+    print("Creating Plot 2: Happiness vs. GDP (2024)")
+    
+    plt.figure(figsize=(10, 6))
+    sns.regplot(
+        data=df_2024,
+        x='GDP per capita',
+        y='Score',
+        scatter_kws={'alpha':0.6} # Make points slightly transparent
+    )
+    plt.title('Relationship between Happiness and GDP (2024)')
+    plt.ylabel('Happiness Score')
+    plt.xlabel('GDP per capita')
+    plt.show()
+
+    
+    # --- VISUALIZATION 3: Top 10 Happiest Countries (2024) ---
+    print("Creating Plot 3: Top 10 Happiest Countries (2024)")
+    
+    # Sort by 'Score' in descending order and get the top 10
+    top_10_happy = df_2024.sort_values(by='Score', ascending=False).head(10)
+
+    plt.figure(figsize=(12, 7))
+    sns.barplot(
+        data=top_10_happy,
+        x='Score',          # Use Score on the x-axis
+        y='Country Name',   # Use Country Name on the y-axis
+        palette='viridis'   # Use a pleasant color palette
+    )
+    plt.title('Top 10 Happiest Countries (2024)')
+    plt.xlabel('Happiness Score')
+    plt.ylabel('Country')
+    plt.show()
+
+else:
+    print("Skipping 2024-specific plots: No data found for 2024.")
+
+print("Script finished.")
